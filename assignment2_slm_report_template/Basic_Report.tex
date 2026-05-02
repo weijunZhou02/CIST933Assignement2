@@ -59,31 +59,19 @@ Student Names and Student Numbers: \emph{[Insert Details]}\\
 \begin{document}
 \maketitle
 
-% ============================================================
-% Page Limit Notice
-% ============================================================
-\begin{center}
-\fbox{
-\begin{minipage}{0.94\linewidth}
-\textbf{Main Report Page Limit:} The main report must not exceed \textbf{10 pages}, in the style of IEEE conference submissions.
-The 10-page (absolute) limit applies from the abstract through the conclusion.
-References, appendices, full evaluation tables, extended prompts, and the GenAI usage log are excluded from the 10-page limit.
-\end{minipage}
-}
-\end{center}
 
 % ============================================================
 % Abstract
 % ============================================================
 \begin{abstract}
-In this report, we describe a Shakespeare-aware question answering system that uses Retrieval-Augmented Generation (RAG) with a Small Language Model (SLM). The system helps users who do not have Shakespeare background to ask questions about three plays---\textit{Hamlet}, \textit{Macbeth}, and \textit{Romeo and Juliet}---and get easy-to-understand answers based on the actual text. We use TinyLlama-1.1B-Chat for text generation and sentence-transformers/all-MiniLM-L6-v2 for embeddings. We chunk the text at scene level and add summary and keywords to each chunk to help the retrieval. We also cache the embeddings on disk so the system starts faster after the first run. We test the system with 15 questions covering five types: contextual QA, concept explanation, evidence retrieval, stylised generation, and robustness. The results show that RAG clearly improves the answer quality compared to a prompt-only baseline. However, both systems still have problems like hallucination and not following instructions well, which is expected for a small 1.1B model.
+In this report, we describe a Shakespeare-aware question answering system that uses Retrieval-Augmented Generation (RAG) with a Small Language Model (SLM). The system helps users who do not have Shakespeare background to ask questions about three plays---\textit{Hamlet}, \textit{Macbeth}, and \textit{Romeo and Juliet}---and get easy-to-understand answers based on the actual text. We use TinyLlama-1.1B-Chat for text generation and sentence-transformers/all-MiniLM-L6-v2 for embeddings. We chunk the text at scene level and add summary and keywords to each chunk to help the retrieval. We also cache the embeddings on disk so the system starts faster after the first run. We test the system with 15 questions covering five types: contextual QA, concept explanation, evidence retrieval, stylised generation, and robustness. The results show that RAG improves grounding and retrieval relevance compared with the prompt-only baseline. However, the improvement in answer correctness is not always stable, because TinyLlama sometimes ignores the retrieved context or adds unsupported details. This shows both the value and the limitation of using a small 1.1B model for Shakespeare-focused question answering.
 \end{abstract}
 
 % ============================================================
 \section{Introduction and Problem Formulation}
 \label{sec:introduction}
 
-In this project, we try to adapt a pretrained Small Language Model (SLM) so that it can answer questions about Shakespeare's plays. This is basically a domain adaptation problem, because Shakespearean English is very different from modern English in terms of vocabulary, grammar, and expressions. Most pretrained models are trained on modern text, so they may not know the details of Shakespeare's plays very well.
+This project adapts a pretrained Small Language Model (SLM) to answer questions about Shakespeare's plays. The task can be viewed as a domain adaptation problem, because Shakespearean English differs from modern English in vocabulary, grammar, idiom, and cultural context.Most pretrained models are trained on modern text, so they may not know the details of Shakespeare's plays very well.
 
 \textbf{Problem statement.} Our goal is to build a system that can help someone who has never read Shakespeare before. The user can ask questions about three plays---\textit{Hamlet}, \textit{Macbeth}, and \textit{Romeo and Juliet}---and get clear, easy-to-understand answers that are based on the actual play text. The system needs to support four types of interaction: concept explanation, contextual QA, evidence retrieval, and stylised generation.
 
@@ -132,6 +120,8 @@ Romeo and Juliet & 25 & 1,126 & $\sim$750 \\
 \end{tabular}
 \end{table}
 
+The 73 scene-level records are the original structured scene records. After long-scene splitting, the final retrieval index contains 152 chunks. This distinction is important because evaluation and retrieval are performed over the indexed chunks, not only the original scene records.
+
 \subsection{Dataset Schema}
 
 Each scene record keeps the following metadata:
@@ -153,6 +143,7 @@ Each scene record keeps the following metadata:
 
 The \texttt{scene\_summary} and \texttt{keywords} fields are already in the dataset. They are written in modern English and help explain what each scene is about. We use them as supplementary information to help connect the user's modern English query with the old Shakespearean text. In our system, we put these annotations at the top of each chunk as headers, and the original Shakespeare text comes after them. This way, the primary text and the supplementary material are clearly separated.
 
+
 \subsection{Chunking Strategy}
 
 We use a \textbf{scene-level chunking strategy with summary and keyword enrichment}. For each scene, we make one retrieval chunk by putting the summary, keywords, and location at the top, followed by the original scene text:
@@ -166,7 +157,8 @@ Location: <location>
 
 \textbf{Why scene-level.} We chose scene-level because it keeps the whole conversation between characters together, so the context is not broken. If we used utterance-level, each chunk would be just one line from one speaker, and you would lose the relationship between characters in that scene. Adding the summary at the top also helps, because the summary is in modern English, which makes it easier for the embedding model to match with the user's question.
 
-\textbf{Handling long scenes.} Some scenes have more than 4,000 characters, which is too long for the embedding model to handle well (MiniLM-L6-v2 can only process about 256 tokens). For these long scenes, we split them into smaller sub-chunks with 400 characters of overlap at sentence boundaries, so we do not lose context between the parts. After splitting, we get about 80 chunks from the original 73 scenes.
+\textbf{Handling long scenes.} Some scenes have more than 4,000 characters, which is too long for the embedding model to handle well (MiniLM-L6-v2 can only process about 256 tokens). For these long scenes, we split them into smaller sub-chunks with 400 characters of overlap at sentence boundaries, so we do not lose context between the parts.
+After splitting, the 73 original scene records produce 152 retrieval chunks. Hamlet contributes 60 chunks, Macbeth contributes 39 chunks, and Romeo and Juliet contributes 53 chunks.
 
 \textbf{Trade-offs.} Scene-level chunks are bigger than utterance-level chunks, so if a question is about one specific line, the retrieval might be less precise. But in practice, the summary at the top of each chunk works like a semantic anchor, and in our tests, the system usually retrieves the right scene for most questions.
 
@@ -195,7 +187,8 @@ We use the \textit{same model} (TinyLlama-1.1B-Chat) and \textit{same generation
 
 \subsection{RAG-Based System}
 
-The RAG system adds retrieved evidence from the Shakespeare plays to help the language model give better answers. The pipeline works like this:
+The RAG system adds retrieved evidence from the Shakespeare plays to help the language model give better answers. This follows the general idea of retrieval-augmented generation, where generated responses are conditioned on retrieved external passages rather than only on model parameters \cite{rag}.
+The pipeline works like this:
 
 \begin{enumerate}
     \item \textbf{Query embedding}: We use MiniLM-L6-v2 to turn the user's question into a vector.
@@ -234,7 +227,8 @@ Summary: Macbeth murders Duncan...
 
 \subsection{Model Choice and Justification}
 
-\textbf{Generation model: TinyLlama-1.1B-Chat-v1.0.} This is a 1.1 billion parameter model that has been fine-tuned for chat. We chose it because:
+\textbf{Generation model: TinyLlama-1.1B-Chat-v1.0.} This is a 1.1 billion parameter model that has been fine-tuned for chat and is suitable for lightweight local deployment \cite{tinyllama}. We chose it because:
+
 \begin{itemize}
     \item \textbf{Small size}: It is only about 2~GB (FP16), so it can run on a normal laptop with 8~GB RAM.
     \item \textbf{Chat ability}: Because it is fine-tuned for chat, it can follow instructions in the prompt, which is important for our system.
@@ -243,9 +237,10 @@ Summary: Macbeth murders Duncan...
 
 We load the model only once using a singleton pattern in \texttt{src/model.py}, and both the baseline and RAG systems share the same model. This saves memory and makes sure the generation is consistent.
 
-\textbf{Embedding model: sentence-transformers/all-MiniLM-L6-v2.} This is a small embedding model (22M parameters) that converts text into 384-dimensional vectors. It is a popular choice for semantic search and runs fast on CPU---it takes about 10 seconds to embed all 73 chunks. We did not use bigger embedding models like BGE because for our small dataset, the improvement would be very small but the cost would be higher.
+\textbf{Embedding model: sentence-transformers/all-MiniLM-L6-v2.} This is a small embedding model that converts text into dense vector representations for semantic retrieval. This choice is related to sentence-level embedding methods such as Sentence-BERT and compact Transformer models such as MiniLM \cite{sentence-bert,minilm}. It is a popular choice for semantic search and runs fast on CPU---it takes only a short time to embed all 152 retrieval chunks in our dataset. We did not use larger embedding models such as BGE because the dataset is small, and the extra computational cost would not be justified for this prototype.
 
-\textbf{Retrieval method: cosine similarity with scikit-learn.} We use scikit-learn's \texttt{cosine\_similarity} to compare the query vector with all chunk vectors. Since we only have about 80 chunks, this is very fast and we do not need heavy tools like FAISS or Chroma. Keeping it simple also makes the code easier to understand and debug.
+
+\textbf{Retrieval method: cosine similarity with scikit-learn.} We use scikit-learn's \texttt{cosine\_similarity} to compare the query vector with all chunk vectors. Since we only have about 152 chunks, this is very fast and we do not need heavy tools like FAISS or Chroma. Keeping it simple also makes the code easier to understand and debug.
 
 % ============================================================
 \section{System Design and Implementation}
@@ -262,7 +257,7 @@ User Query
     |
     v
 [Embed Query] --> [Cosine Similarity]
-  (MiniLM)        (against 73+ chunks)
+  (MiniLM)        (against 152 chunks)
                         |
                    top-k chunks
                         |
@@ -317,7 +312,7 @@ assignment2_starter_code/
 \begin{itemize}
     \item TinyLlama can only handle 2,048 tokens at a time, so we have to cut long retrieved passages.
     \item We only have a command-line interface, no web UI.
-    \item The retrieval is just brute-force cosine similarity. This is fine for our 80 chunks, but it would be slow if the dataset was much bigger.
+    \item The retrieval is based on brute-force cosine similarity. This is fine for our 152 chunks, but it would become less efficient for a much larger corpus.
 \end{itemize}
 
 % ============================================================
@@ -383,8 +378,7 @@ We evaluate each answer on five things:
 
 \subsection{Evaluation Procedure}
 
-Our evaluation script (\texttt{src/evaluate.py}) runs both systems on all 15 questions automatically and saves the results to a CSV file. The CSV has 30 rows (15 questions $\times$ 2 systems). Each row has the question, which system was used, the retrieved passages (for RAG), the generated response, and five empty score columns. After running the script, we fill in the scores manually based on the rubric.
-
+Our evaluation script (\texttt{src/evaluate.py}) runs both systems on all 15 questions automatically and saves the outputs to a CSV file. The CSV has 30 rows (15 questions $\times$ 2 systems). Each row records the question, system type, retrieved passages for RAG, generated response, and score fields. The final scores are then assigned manually using the 1--5 rubric, because correctness, grounding, usefulness, and style quality require human judgement.
 % ============================================================
 \section{Results and Analysis}
 \label{sec:results}
@@ -401,13 +395,13 @@ Table~\ref{tab:results-summary} shows the average scores for each system across 
 \toprule
 System & Corr. & Grnd. & Ret. & Use. & Style \\
 \midrule
-Baseline & 2.3 & 1.0 & N/A & 2.5 & 2.0 \\
+Baseline & 2.3 & 1.0 & N/A & 2.3 & 1.0 \\
 RAG & 3.2 & 3.5 & 3.8 & 3.3 & 2.5 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textit{Note: These scores are our estimates based on reading through the outputs carefully. The full evaluation table with all scores is in Appendix~\ref{app:evaluation}.}
+\textit{Note: These scores are manually assigned using the rubric in Section~\ref{sec:evaluation-design}. The full per-question evaluation table is provided in Appendix~\ref{app:evaluation}.}
 
 \textbf{What we found:}
 
@@ -453,6 +447,7 @@ RAG & 3.2 & 3.5 & 3.8 & 3.3 & 2.5 \\
 We found five main types of failures in our evaluation.
 
 \textbf{Failure 1: Making up wrong plot details.}
+This is a hallucination problem, where the model produces fluent but unsupported information \cite{hallucination}.
 In Q1, the RAG system says Duncan is ``the son of King Duncan and Queen Margaret,'' which is completely made up. In G6, it says Romeo and Juliet die of ``starvation,'' which is totally wrong (Romeo actually takes poison, and Juliet stabs herself). Even though the system retrieved the right scene (Act~5 Scene~1, score 0.631), the model did not use the information correctly.
 
 \textit{Why this happens:} TinyLlama is a small model (only 1.1B parameters), so when the prompt is long, it has trouble following it properly and sometimes falls back to making things up.
@@ -485,10 +480,10 @@ We used Windsurf Cascade (which is powered by Claude) as a coding assistant duri
 
 \textbf{What we used it for:}
 \begin{itemize}
-    \item Writing code: data loader, chunking, retrieval, RAG pipeline, evaluation script.
-    \item Debugging: fixing environment problems like h5py DLL errors and TensorFlow import issues.
-    \item Documentation: writing README files and drafting parts of this report.
-    \item Discussing design choices: like which chunking strategy to use, which model to pick, and how to set up evaluation.
+    \item Discussing implementation options for the data loader, chunking, retrieval, RAG pipeline, and evaluation script.
+    \item Analysing debugging issues, such as Windows environment problems and unnecessary TensorFlow imports.
+    \item Reviewing README structure, report wording, and consistency between reported results and actual outputs.
+    \item Checking design choices, such as chunking strategy, model choice, retrieval method, and evaluation setup.
 \end{itemize}
 
 \textbf{How we checked the results:}
@@ -503,6 +498,7 @@ We used Windsurf Cascade (which is powered by Claude) as a coding assistant duri
     \item The AI suggested using FAISS for retrieval, but we decided cosine similarity with NumPy was enough for our small dataset, so we did not use FAISS.
     \item Some of the generated documentation was too wordy, so we edited it to be clearer.
 \end{itemize}
+
 
 The detailed GenAI usage log is in Appendix~\ref{app:genai-log}.
 
@@ -536,7 +532,7 @@ In this project, we built a Shakespeare-aware RAG system using TinyLlama-1.1B-Ch
     \item \textbf{Fine-tuning with LoRA}: Do some lightweight fine-tuning on Shakespeare QA data to make the model better at this specific task.
 \end{itemize}
 
-Overall, this project shows that RAG can really help a small model do better on domain-specific tasks. But it also shows that when the model is too small, there are clear limits to what you can achieve, no matter how good the retrieval is.
+Overall, this project shows that RAG can make a small model more useful for a bounded domain by giving it access to relevant textual evidence. At the same time, retrieval alone does not guarantee correct generation. When the SLM is very small, hallucination, prompt leakage, and weak instruction following can still reduce answer quality.
 
 % ============================================================
 % References
@@ -574,34 +570,42 @@ Z.~Ji \textit{et al.}, ``Survey of Hallucination in Natural Language Generation,
 \section{Full Evaluation Table}
 \label{app:evaluation}
 
-Table~\ref{tab:full-eval-baseline} and Table~\ref{tab:full-eval-rag} show the full evaluation results for the baseline and RAG systems. The score columns need to be filled in manually using the 1--5 rubric from Section~\ref{sec:evaluation-design}.
+Table~\ref{tab:full-eval-baseline} and Table~\ref{tab:full-eval-rag} show the full evaluation results for the baseline and RAG systems. The scores were assigned manually using the 1--5 rubric from Section~\ref{sec:evaluation-design}.
 
-\begin{table*}[h]
+\begin{table*}[t]
 \centering
-\caption{Full evaluation results --- Baseline system. Fill in scores (1--5) manually.}
+\caption{Full evaluation results --- Baseline system. Scores are assigned manually on a 1--5 scale.}
 \label{tab:full-eval-baseline}
-\begin{tabularx}{\textwidth}{llp{1.5cm}p{1.2cm}p{1.2cm}p{1.2cm}p{1.2cm}X}
+\small
+\begin{tabularx}{\textwidth}{llp{0.9cm}p{0.9cm}p{0.9cm}p{0.9cm}p{0.9cm}X}
 \toprule
 ID & Type & Corr. & Grnd. & Ret. & Use. & Style & Comments \\
 \midrule
-Q1 & ctx\_qa & & & N/A & & & \\
-Q2 & ctx\_qa & & & N/A & & & \\
-Q3 & ctx\_qa & & & N/A & & & \\
-Q4 & ctx\_qa & & & N/A & & & \\
-Q5 & ctx\_qa & & & N/A & & & \\
-Q6 & ctx\_qa & & & N/A & & & \\
-G1 & concept & & & N/A & & & \\
-G2 & concept & & & N/A & & & \\
-G3 & concept & & & N/A & & & \\
-G4 & evidence & & & N/A & & & \\
-G5 & evidence & & & N/A & & & \\
-G6 & ctx\_qa & & & N/A & & & \\
-G7 & stylised & & & N/A & & & \\
-G8 & stylised & & & N/A & & & \\
-G9 & robust & & & N/A & & & \\
+Q1 & ctx\_qa & 2 & 1 & N/A & 2 & N/A & Partly mentions ambition, but misses prophecy and Lady Macbeth. \\
+Q2 & ctx\_qa & 3 & 1 & N/A & 3 & N/A & Gives a general change, but lacks specific evidence of tyranny. \\
+Q3 & ctx\_qa & 2 & 1 & N/A & 2 & N/A & Some relevant ideas, but includes inaccurate details. \\
+Q4 & ctx\_qa & 3 & 1 & N/A & 3 & N/A & Partly explains Ophelia as a victim, but misses court manipulation. \\
+Q5 & ctx\_qa & 4 & 1 & N/A & 4 & N/A & Mostly correct explanation of love versus family loyalty. \\
+Q6 & ctx\_qa & 4 & 1 & N/A & 4 & N/A & Correct general explanation, but misses secrecy and miscommunication. \\
+G1 & concept & 4 & 1 & N/A & 4 & N/A & Clear basic explanation, with minor overstatement. \\
+G2 & concept & 2 & 1 & N/A & 2 & N/A & Identifies Claudius, but gives wrong family details. \\
+G3 & concept & 1 & 1 & N/A & 1 & N/A & Incorrect account of Mercutio's death. \\
+G4 & evidence & 2 & 1 & N/A & 2 & N/A & Partly correct prophecy, but incomplete and unsupported. \\
+G5 & evidence & 1 & 1 & N/A & 1 & N/A & Completely answers the wrong play. \\
+G6 & ctx\_qa & 2 & 1 & N/A & 2 & N/A & Gives the broad tragedy, but misses poison and stabbing. \\
+G7 & stylised & 2 & 1 & N/A & 1 & 1 & Too long, unfinished, and weak Shakespearean style. \\
+G8 & stylised & 2 & 1 & N/A & 2 & 1 & Reflects grief, but is too modern, generic, and overlong. \\
+G9 & robust & 1 & 1 & N/A & 1 & N/A & Hallucinates an unsupported out-of-domain answer. \\
 \bottomrule
 \end{tabularx}
+
+\vspace{0.5em}
+\begin{minipage}{0.96\textwidth}
+\footnotesize
+\textit{Note.} Retrieval relevance is not applicable to the baseline system because it does not retrieve source passages. It is only scored for the RAG-based system.
+\end{minipage}
 \end{table*}
+
 
 \begin{table*}[h]
 \centering
@@ -630,6 +634,7 @@ G9 & robust & & & & & & Top-1 score: 0.162 \\
 \end{tabularx}
 \end{table*}
 
+\clearpage
 \section{Representative Prompts}
 \label{app:prompts}
 
@@ -711,36 +716,103 @@ Shakespearean-style response (<=150 words):
 
 \textbf{RAG response:} ``Romeo and Juliet die from the same cause: starvation.'' This is entirely incorrect. The correct answer (Romeo takes poison; Juliet stabs herself) was present in the retrieved context (Act 5 Scene 1) but the model failed to extract and use it.
 
+
 \section{GenAI Usage Log}
 \label{app:genai-log}
 
-\begin{table*}[h]
+
+\begin{table*}[!t]
 \centering
 \caption{GenAI usage log.}
 \label{tab:genai-log}
-\begin{tabularx}{\textwidth}{p{2.2cm} p{3.0cm} p{3.0cm} X}
+\small
+\begin{tabularx}{\textwidth}{p{2.2cm} p{3.4cm} p{3.4cm} X}
 \toprule
 Tool & Prompt or Task & Useful Output & Verification / Modification \\
 \midrule
-Windsurf Cascade & Implement data loader for Shakespeare JSON files & Generated \texttt{data\_loader.py} with scene and utterance extraction & Tested with all 3 plays; verified record counts \\
+
+Windsurf Cascade 
+& How should the provided Shakespeare JSON files be loaded so that play, act, scene, speaker, and utterance metadata are preserved? 
+& Suggested a clearer structure for \texttt{data\_loader.py}, including scene-level and utterance-level extraction. 
+& Tested the loader on all three required plays and checked the scene and utterance counts against the dataset files. \\
+
 \midrule
-Windsurf Cascade & Implement scene-level chunking with summary enrichment & Generated \texttt{chunking.py} with long-scene splitting & Verified chunk counts and content manually \\
+
+Windsurf Cascade 
+& Why might scene-level chunks be too long for retrieval, and how can long scenes be split without losing metadata? 
+& Suggested a scene-based chunking approach with long-scene splitting and metadata retention. 
+& Inspected sample chunks manually and verified that each chunk still included play, act, scene, and speaker information where available. \\
+
 \midrule
-Windsurf Cascade & Implement embedding caching in retrieval.py & Added disk-based caching with content hash & Tested cache hit/miss; verified hash invalidation \\
+
+Windsurf Cascade 
+& What are the risks of recomputing embeddings each time, and how can caching be added safely? 
+& Suggested a content-hash based cache design for \texttt{retrieval.py}. 
+& Tested cache hit and cache miss behaviour, and checked that embeddings were rebuilt when the input content changed. \\
+
 \midrule
-Windsurf Cascade & Implement shared model loader (model.py) & Singleton pattern for TinyLlama loading & Verified model loads once across baseline and RAG \\
+
+Windsurf Cascade 
+& Why is repeated loading of the language model inefficient, and how can the loading process be shared across baseline and RAG systems? 
+& Suggested a shared model-loading structure in \texttt{model.py} to avoid unnecessary repeated loading. 
+& Verified that the model was loaded once and reused by both the baseline and RAG components. \\
+
 \midrule
-Windsurf Cascade & Implement baseline system & Generated \texttt{baseline.py} with prompt-only generation & Tested with sample questions \\
+
+Windsurf Cascade 
+& How can a prompt-only baseline be structured so it is comparable with the RAG system? 
+& Provided guidance for a simple baseline flow using the same question set but without retrieved evidence. 
+& Ran sample questions and confirmed that the baseline output could be compared with RAG output in the evaluation table. \\
+
 \midrule
-Windsurf Cascade & Implement RAG chatbot with stylised generation & Generated \texttt{rag\_chatbot.py} with auto-detection & Tested all 4 interaction types manually \\
+
+Windsurf Cascade 
+& How should retrieved passages be connected to the answer prompt so that the model uses evidence rather than only prior knowledge? 
+& Suggested a RAG prompt structure that places retrieved context before the user question and asks the model to avoid unsupported details. 
+& Tested concept, contextual QA, evidence retrieval, and stylised response examples manually. Failure cases were kept for later analysis. \\
+
 \midrule
-Windsurf Cascade & Implement evaluation script & Generated \texttt{evaluate.py} with CSV output & Ran full evaluation; verified 30-row CSV output \\
+
+Windsurf Cascade 
+& How can the evaluation output be organised so that baseline and RAG answers can be compared consistently? 
+& Suggested a CSV format containing question ID, system type, retrieved passages, response, scores, and comments. 
+& Ran the full evaluation and checked that the CSV contained 15 questions for both baseline and RAG systems. \\
+
 \midrule
-Windsurf Cascade & Debug h5py DLL import error & Suggested fake module injection in config.py & Verified system runs without TensorFlow \\
+
+Windsurf Cascade 
+& Why does the environment raise an \texttt{h5py} DLL import error, and what is a safe workaround if TensorFlow is not required? 
+& Suggested isolating the unnecessary TensorFlow-related dependency path and using a lightweight workaround. 
+& Verified that the system could run without relying on TensorFlow functions. \\
+
 \midrule
-Windsurf Cascade & Write README files & Generated English and Chinese READMEs & Reviewed and corrected project structure details \\
+
+ChatGPT 
+& Are the dataset statistics, chunk counts, and report descriptions consistent with the current code outputs? 
+& Identified inconsistencies between the number of original scene records and the final retrieval chunks after long-scene splitting. 
+& Rechecked the code outputs and revised the report wording to distinguish 73+ scene records from the larger retrieval chunk index. \\
+
 \midrule
-Windsurf Cascade & Draft technical report & Generated LaTeX report structure and content & Reviewed all claims against actual outputs; corrected evaluation scores and analysis \\
+
+ChatGPT 
+& Why do some evaluation outputs show weak grounding or hallucination even when RAG is used? 
+& Helped classify failure cases such as irrelevant retrieval, unsupported generation, excessive stylised length, and out-of-domain hallucination. 
+& Compared the comments with the actual CSV responses and adjusted the analysis so that the report did not overstate RAG performance. \\
+
+\midrule
+
+ChatGPT 
+& How should manual scores be assigned for correctness, grounding, retrieval relevance, usefulness, and style quality? 
+& Suggested a 1--5 scoring interpretation and helped align baseline scores with the absence of retrieval. 
+& Scores were manually reviewed against the actual system responses before being added to the evaluation tables. \\
+
+\midrule
+
+ChatGPT 
+& Does the technical report clearly reflect what the implemented system actually does? 
+& Helped review the report structure, wording, evaluation explanation, and appendix placement. 
+& Corrected wording that sounded too strong, fixed table notes, and aligned the report with the demonstrated system behaviour. \\
+
 \bottomrule
 \end{tabularx}
 \end{table*}
