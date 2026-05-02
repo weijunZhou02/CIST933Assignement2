@@ -210,7 +210,7 @@ Stylised generation 会**自动检测**（通过关键词如 "shakespearean", "g
 
 ## 评估问题分布
 
-共 14 个问题：
+共 15 个问题：
 
 | 来源 | 数量 | 类型覆盖 |
 |------|------|---------|
@@ -219,6 +219,7 @@ Stylised generation 会**自动检测**（通过关键词如 "shakespearean", "g
 | Group (G4-G5) | 2 | evidence_retrieval |
 | Group (G6) | 1 | contextual_qa |
 | Group (G7-G8) | 2 | stylised_generation |
+| Group (G9) | 1 | robustness |
 
 ---
 
