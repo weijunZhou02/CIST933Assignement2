@@ -395,19 +395,28 @@ Table~\ref{tab:results-summary} shows the average scores for each system across 
 
 \begin{table}[h]
 \centering
-\caption{Average evaluation scores (1--5 scale). Higher is better. Scores are based on manual evaluation of generated outputs.}
+\caption{Average evaluation scores (1--5 scale). Higher is better. Values are arithmetic means computed from the per-question scores in Appendix~\ref{app:evaluation}; Style is averaged over the two stylised-generation questions (G7, G8) only.}
 \label{tab:results-summary}
 \begin{tabular}{lccccc}
 \toprule
 System & Corr. & Grnd. & Ret. & Use. & Style \\
 \midrule
-Baseline & 2.3 & 1.0 & N/A & 2.5 & 2.0 \\
-RAG & 3.2 & 3.5 & 3.8 & 3.3 & 2.5 \\
+Baseline & 2.33 & 1.00 & 1.00 & 2.20 & 2.50 \\
+RAG      & 3.00 & 3.27 & 4.00 & 3.00 & 3.50 \\
+\midrule
+$\Delta$ (RAG $-$ Baseline) & +0.67 & +2.27 & +3.00 & +0.80 & +1.00 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\textit{Note: These scores are our estimates based on reading through the outputs carefully. The full evaluation table with all scores is in Appendix~\ref{app:evaluation}.}
+Figure~\ref{fig:results-bar} visualises the per-metric comparison.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=\linewidth]{../report/figure1.png}
+\caption{Average evaluation scores by metric for the Baseline and RAG systems. RAG outperforms the Baseline on every metric, with the largest gains on Retrieval Relevance (+3.00) and Grounding (+2.27).}
+\label{fig:results-bar}
+\end{figure}
 
 \textbf{What we found:}
 
@@ -584,21 +593,21 @@ Table~\ref{tab:full-eval-baseline} and Table~\ref{tab:full-eval-rag} show the fu
 \toprule
 ID & Type & Corr. & Grnd. & Ret. & Use. & Style & Comments \\
 \midrule
-Q1 & ctx\_qa & & & N/A & & & \\
-Q2 & ctx\_qa & & & N/A & & & \\
-Q3 & ctx\_qa & & & N/A & & & \\
-Q4 & ctx\_qa & & & N/A & & & \\
-Q5 & ctx\_qa & & & N/A & & & \\
-Q6 & ctx\_qa & & & N/A & & & \\
-G1 & concept & & & N/A & & & \\
-G2 & concept & & & N/A & & & \\
-G3 & concept & & & N/A & & & \\
-G4 & evidence & & & N/A & & & \\
-G5 & evidence & & & N/A & & & \\
-G6 & ctx\_qa & & & N/A & & & \\
-G7 & stylised & & & N/A & & & \\
-G8 & stylised & & & N/A & & & \\
-G9 & robust & & & N/A & & & \\
+Q1 & ctx\_qa & 2 & 1 & N/A & 2 & N/A & No retrieval; mentions ambition vaguely but invents 'Duncan refuses to bow' detail; omits witches \& Lady Macbeth. \\
+Q2 & ctx\_qa & 2 & 1 & N/A & 2 & N/A & Generic moralising tone; doesn't mention Banquo's murder, banquet scene, or paranoia. \\
+Q3 & ctx\_qa & 3 & 1 & N/A & 2 & N/A & Long but generic; gives plot context but never actually answers WHY Hamlet delays. \\
+Q4 & ctx\_qa & 3 & 1 & N/A & 3 & N/A & Treats Ophelia as generic tragic-love symbol; misses Polonius/Laertes/court politics aspects. \\
+Q5 & ctx\_qa & 3 & 1 & N/A & 3 & N/A & Captures love/family tension at surface level; no textual evidence; misses kinsman aspect of Tybalt. \\
+Q6 & ctx\_qa & 3 & 1 & N/A & 3 & N/A & Reasonable thematic answer about feud driving plot, but no specific evidence cited. \\
+G1 & concept & 3 & 1 & N/A & 3 & N/A & Solid character summary of Lady Macbeth's role driving Macbeth's downfall, but no specific evidence. \\
+G2 & concept & 2 & 1 & N/A & 2 & N/A & Major factual error: calls Claudius 'father of Gertrude'; he is her husband and Hamlet's uncle. \\
+G3 & concept & 2 & 1 & N/A & 2 & N/A & Hallucinates Mercutio's death ('falls into a pit created by the Montagues') instead of being killed by Tybalt. \\
+G4 & evidence & 2 & 1 & N/A & 2 & N/A & Incomplete and partly wrong: misses Thane of Cawdor + king prophecies; vague 'Banquo will have a son'. \\
+G5 & evidence & 1 & 1 & N/A & 1 & N/A & Severe hallucination --- describes Twelfth Night plot (Viola/Olivia/Cesario) instead of Hamlet's Mousetrap. \\
+G6 & ctx\_qa & 2 & 1 & N/A & 2 & N/A & Says Romeo 'kills himself' and Juliet 'dies of broken heart' --- partially right but missing poison/dagger and miscommunication. \\
+G7 & stylised & 3 & 1 & N/A & 3 & 3 & Dialogue format with dramatic tone; reasonable Shakespearean register but no source grounding and no creative-output disclaimer. \\
+G8 & stylised & 3 & 1 & N/A & 2 & 2 & Mostly modern English ('I sit here, surrounded by my family'); lacks Early Modern register and Hamlet's contemplative voice. \\
+G9 & robust & 1 & 1 & N/A & 1 & N/A & Out-of-domain question, system cannot handle queries unrelated to Shakespeare \\
 \bottomrule
 \end{tabularx}
 \end{table*}
@@ -611,21 +620,21 @@ G9 & robust & & & N/A & & & \\
 \toprule
 ID & Type & Corr. & Grnd. & Ret. & Use. & Style & Comments \\
 \midrule
-Q1 & ctx\_qa & & & & & & Top-1: Act 2 Sc 2 (0.740) \\
-Q2 & ctx\_qa & & & & & & Top-1: Act 3 Sc 6 (0.623) \\
-Q3 & ctx\_qa & & & & & & Top-1: Act 3 Sc 1 (0.592) \\
-Q4 & ctx\_qa & & & & & & Top-1: Act 2 Sc 1 (0.619) \\
-Q5 & ctx\_qa & & & & & & Top-1: Act 3 Sc 2 (0.669) \\
-Q6 & ctx\_qa & & & & & & Top-1: Prologue (0.557) \\
-G1 & concept & & & & & & Top-1: Act 3 Sc 2 (0.614) \\
-G2 & concept & & & & & & Top-1: Act 3 Sc 3 (0.589) \\
-G3 & concept & & & & & & Top-1: Act 3 Sc 1 (0.558) \\
-G4 & evidence & & & & & & Top-1: Act 1 Sc 3 (0.697) \\
-G5 & evidence & & & & & & Top-1: Act 3 Sc 2 (0.459) \\
-G6 & ctx\_qa & & & & & & Top-1: Act 5 Sc 1 (0.631) \\
-G7 & stylised & & & & & & is\_stylised=True \\
-G8 & stylised & & & & & & is\_stylised=True \\
-G9 & robust & & & & & & Top-1 score: 0.162 \\
+Q1 & ctx\_qa & 3 & 4 & 4 & 3 & N/A & [Act 2.2 (0.74)] Retrieves correct Act 2.2 murder scene; partially uses evidence but fabricates 'son of King Duncan and Queen Margaret'. \\
+Q2 & ctx\_qa & 3 & 3 & 4 & 3 & N/A & [Act 3.6 (0.62)] Retrieves Act 3.6 tyranny scene correctly, but answer wrongly claims Macbeth 'becomes compassionate and seeks forgiveness'. \\
+Q3 & ctx\_qa & 3 & 3 & 3 & 3 & N/A & [Act 3.1 (0.59)] Retrieves Act 3.1 'To be or not to be'; mentions hesitation but invents claim that 'Polonius confirms Claudius is true king'. \\
+Q4 & ctx\_qa & 3 & 4 & 4 & 3 & N/A & [Act 2.1 (0.62)] Retrieves Polonius/Reynaldo scene; mentions father's death, Laertes, suicide; describes plot impact reasonably. \\
+Q5 & ctx\_qa & 4 & 4 & 5 & 4 & N/A & [Act 3.2 (0.67)] Retrieves the exact Act 3.2 Capulet's orchard scene; explicitly identifies family-loyalty conflict. \\
+Q6 & ctx\_qa & 4 & 4 & 5 & 4 & N/A & [Prologue (0.56)] Retrieves the Prologue (perfect grounding choice); covers feud-deaths causal link explicitly. \\
+G1 & concept & 3 & 3 & 4 & 3 & N/A & [Act 3.2 (0.61)] Retrieves Act 3.2 palace scene; mentions her letter and Cawdor reference, but mistakenly puts Cawdor title on her. \\
+G2 & concept & 3 & 3 & 4 & 3 & N/A & [Act 3.3 (0.59)] Retrieves Act 3.3 prayer scene; correctly states he murdered Hamlet's father, but wrongly calls him 'father of Hamlet'. \\
+G3 & concept & 4 & 4 & 5 & 4 & N/A & [Act 3.1 (0.56)] Retrieves Act 3.1 correctly; states Tybalt kills Mercutio leading to Romeo's revenge --- accurate and grounded. \\
+G4 & evidence & 4 & 4 & 5 & 4 & N/A & [Act 1.3 (0.70)] Retrieves Act 1.3 heath scene; correctly identifies Banquo as 'root and father of many kings'. \\
+G5 & evidence & 3 & 3 & 4 & 2 & N/A & [Act 3.2 (0.46)] Retrieves correct Act 3.2 scene but answer is incoherent --- quotes random fragments without explaining the trap on Claudius. \\
+G6 & ctx\_qa & 1 & 2 & 5 & 1 & N/A & [Act 5.1 (0.63)] Retrieval is perfect (Act 5.1), but generation hallucinates that both die of starvation --- clear failure of grounding despite good retrieval. \\
+G7 & stylised & 3 & 4 & 4 & 4 & 4 & [is\textbackslash\{\}\_stylised=True] Includes explicit creative-output disclaimer; opens with a real Macbeth quotation; clearly distinguished from factual answer. \\
+G8 & stylised & 3 & 3 & 3 & 3 & 3 & [is\textbackslash\{\}\_stylised=True] Includes creative-output disclaimer and references Act 2.2; rambles into meta-description rather than producing a tight stylised speech. \\
+G9 & robust & 1 & 1 & 1 & 1 & N/A & [score 0.16 (off-topic)] Out-of-domain question, system cannot handle queries unrelated to Shakespeare \\
 \bottomrule
 \end{tabularx}
 \end{table*}
