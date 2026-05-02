@@ -187,7 +187,7 @@ Runs a simple baseline test.
 python src/evaluate.py
 ```
 
-Automatically runs baseline + RAG on all 14 questions (6 instructor + 8 group-designed) and outputs results to `results/evaluation_results.csv`.
+Automatically runs baseline + RAG on all 15 questions (6 instructor + 9 group-designed) and outputs results to `results/evaluation_results.csv`.
 
 Manually score each response in the CSV (1–5 scale) for use in the evaluation section of the report.
 
@@ -210,7 +210,7 @@ Stylised generation is **auto-detected** via keywords such as "shakespearean", "
 
 ## Evaluation Question Distribution
 
-14 questions in total:
+15 questions in total:
 
 | Source | Count | Types Covered |
 |--------|-------|---------------|
@@ -219,6 +219,7 @@ Stylised generation is **auto-detected** via keywords such as "shakespearean", "
 | Group (G4–G5) | 2 | evidence_retrieval |
 | Group (G6) | 1 | contextual_qa |
 | Group (G7–G8) | 2 | stylised_generation |
+| Group (G9) | 1 | robustness |
 
 ---
 
