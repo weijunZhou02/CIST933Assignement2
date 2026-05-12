@@ -226,29 +226,7 @@ Figure~\ref{fig:pipeline} shows how the whole RAG pipeline works.
 
 \begin{figure}[h]
 \centering
-\begin{lstlisting}[language={},frame=none]
-User Query
-    |
-    v
-[Embed Query] --> [Cosine Similarity]
-  (MiniLM)        (against 73+ chunks)
-                        |
-                   top-k chunks
-                        |
-                        v
-              [Build RAG Prompt]
-              (system prompt +
-               retrieved text +
-               user question)
-                        |
-                        v
-              [TinyLlama Generate]
-                        |
-                        v
-              [Display Answer +
-               Retrieved Evidence]
-\end{lstlisting}
-\caption{End-to-end RAG pipeline.}
+\includegraphics[width=0.5\textwidth]{pip.jpg}
 \label{fig:pipeline}
 \end{figure}
 
